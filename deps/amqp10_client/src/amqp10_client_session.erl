@@ -654,6 +654,8 @@ translate_filters(Filters) when is_map(Filters) -> {
         (<<"apache.org:no-local-filter:list">> = K, V, Acc) when is_list(V) ->
             [{{symbol, K}, {described, {symbol, K}, lists:map(fun(Id) -> {utf8, Id} end, V)}} | Acc];
         (<<"apache.org:selector-filter:string">> = K, V, Acc) when is_binary(V) ->
+                [{{symbol, K}, {described, {symbol, K}, {utf8, V}}} | Acc];
+        (<<"com.microsoft:session-filter">> = K, V, Acc) when is_binary(V) ->
                 [{{symbol, K}, {described, {symbol, K}, {utf8, V}}} | Acc]
         end,
         [],
