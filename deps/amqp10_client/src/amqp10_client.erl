@@ -45,6 +45,7 @@
 
 -type snd_settle_mode() :: amqp10_client_session:snd_settle_mode().
 -type rcv_settle_mode() :: amqp10_client_session:rcv_settle_mode().
+-type settle_mode() :: {snd_settle_mode(), rcv_settle_mode()}.
 
 -type terminus_durability() :: amqp10_client_session:terminus_durability().
 
@@ -159,13 +160,13 @@ end_session(Pid) ->
 %% This is a convenience function that awaits attached event
 %% for the link before returning.
 attach_sender_link_sync(Session, Name, Target) ->
-    attach_sender_link_sync(Session, Name, Target, mixed).
+    attach_sender_link_sync(Session, Name, Target, {mixed, first}).
 
 %% @doc Synchronously attach a link on 'Session'.
 %% This is a convenience function that awaits attached event
 %% for the link before returning.
 -spec attach_sender_link_sync(pid(), binary(), binary(),
-                              snd_settle_mode()) ->
+                              settle_mode()) ->
     {ok, link_ref()} | link_timeout.
 attach_sender_link_sync(Session, Name, Target, SettleMode) ->
     attach_sender_link_sync(Session, Name, Target, SettleMode, none).
@@ -174,7 +175,7 @@ attach_sender_link_sync(Session, Name, Target, SettleMode) ->
 %% This is a convenience function that awaits attached event
 %% for the link before returning.
 -spec attach_sender_link_sync(pid(), binary(), binary(),
-                              snd_settle_mode(), terminus_durability()) ->
+                              settle_mode(), terminus_durability()) ->
     {ok, link_ref()} | link_timeout.
 attach_sender_link_sync(Session, Name, Target, SettleMode, Durability) ->
     {ok, Ref} = attach_sender_link(Session, Name, Target, SettleMode,
@@ -194,14 +195,14 @@ attach_sender_link_sync(Session, Name, Target, SettleMode, Durability) ->
 -spec attach_sender_link(pid(), binary(), binary()) -> {ok, link_ref()}.
 attach_sender_link(Session, Name, Target) ->
     % mixed should work with any type of msg
-    attach_sender_link(Session, Name, Target, mixed).
+    attach_sender_link(Session, Name, Target, {mixed, first}).
 
 %% @doc Attaches a sender link to a target.
 %% This is asynchronous and will notify completion of the attach request to the
 %% caller using an amqp10_event of the following format:
 %% {amqp10_event, {link, LinkRef, attached | {detached, Why}}}
 -spec attach_sender_link(pid(), binary(), binary(),
-                         snd_settle_mode()) ->
+                         settle_mode()) ->
     {ok, link_ref()}.
 attach_sender_link(Session, Name, Target, SettleMode) ->
     attach_sender_link(Session, Name, Target, SettleMode, none).
@@ -211,14 +212,14 @@ attach_sender_link(Session, Name, Target, SettleMode) ->
 %% caller using an amqp10_event of the following format:
 %% {amqp10_event, {link, LinkRef, attached | {detached, Why}}}
 -spec attach_sender_link(pid(), binary(), binary(),
-                         snd_settle_mode(), terminus_durability()) ->
+                         settle_mode(), terminus_durability()) ->
     {ok, link_ref()}.
-attach_sender_link(Session, Name, Target, SettleMode, Durability) ->
+attach_sender_link(Session, Name, Target, {SndSettleMode, RcvSettleMode}, Durability) ->
     AttachArgs = #{name => Name,
                    role => {sender, #{address => Target,
                                       durable => Durability}},
-                   snd_settle_mode => SettleMode,
-                   rcv_settle_mode => first},
+                   snd_settle_mode => SndSettleMode,
+                   rcv_settle_mode => RcvSettleMode},
     amqp10_client_session:attach(Session, AttachArgs).
 
 %% @doc Attaches a receiver link to a source.
@@ -228,14 +229,14 @@ attach_sender_link(Session, Name, Target, SettleMode, Durability) ->
 -spec attach_receiver_link(pid(), binary(), binary()) ->
     {ok, link_ref()}.
 attach_receiver_link(Session, Name, Source) ->
-    attach_receiver_link(Session, Name, Source, settled).
+    attach_receiver_link(Session, Name, Source, {settled, first}).
 
 %% @doc Attaches a receiver link to a source.
 %% This is asynchronous and will notify completion of the attach request to the
 %% caller using an amqp10_event of the following format:
 %% {amqp10_event, {link, LinkRef, attached | {detached, Why}}}
 -spec attach_receiver_link(pid(), binary(), binary(),
-                           snd_settle_mode()) ->
+                           rcv_settle_mode()) ->
     {ok, link_ref()}.
 attach_receiver_link(Session, Name, Source, SettleMode) ->
     attach_receiver_link(Session, Name, Source, SettleMode, none).
@@ -245,7 +246,7 @@ attach_receiver_link(Session, Name, Source, SettleMode) ->
 %% caller using an amqp10_event of the following format:
 %% {amqp10_event, {link, LinkRef, attached | {detached, Why}}}
 -spec attach_receiver_link(pid(), binary(), binary(),
-                           snd_settle_mode(), terminus_durability()) ->
+                           rcv_settle_mode(), terminus_durability()) ->
     {ok, link_ref()}.
 attach_receiver_link(Session, Name, Source, SettleMode, Durability) ->
     attach_receiver_link(Session, Name, Source, SettleMode, Durability, #{}).
@@ -255,7 +256,7 @@ attach_receiver_link(Session, Name, Source, SettleMode, Durability) ->
 %% caller using an amqp10_event of the following format:
 %% {amqp10_event, {link, LinkRef, attached | {detached, Why}}}
 -spec attach_receiver_link(pid(), binary(), binary(),
-                           snd_settle_mode(), terminus_durability(), filter()) ->
+                           rcv_settle_mode(), terminus_durability(), filter()) ->
     {ok, link_ref()}.
 attach_receiver_link(Session, Name, Source, SettleMode, Durability, Filter) ->
     attach_receiver_link(Session, Name, Source, SettleMode, Durability, Filter, #{}).
@@ -265,15 +266,15 @@ attach_receiver_link(Session, Name, Source, SettleMode, Durability, Filter) ->
 %% caller using an amqp10_event of the following format:
 %% {amqp10_event, {link, LinkRef, attached | {detached, Why}}}
 -spec attach_receiver_link(pid(), binary(), binary(),
-                           snd_settle_mode(), terminus_durability(), filter(),
+                           rcv_settle_mode(), terminus_durability(), filter(),
                            properties()) ->
     {ok, link_ref()}.
-attach_receiver_link(Session, Name, Source, SettleMode, Durability, Filter, Properties) ->
+attach_receiver_link(Session, Name, Source, {SndSettleMode, RcvSettleMode}, Durability, Filter, Properties) ->
     AttachArgs = #{name => Name,
                    role => {receiver, #{address => Source,
                                         durable => Durability}, self()},
-                   snd_settle_mode => SettleMode,
-                   rcv_settle_mode => first,
+                   snd_settle_mode => SndSettleMode,
+                   rcv_settle_mode => RcvSettleMode,
                    filter => Filter,
                    properties => Properties},
     amqp10_client_session:attach(Session, AttachArgs).
